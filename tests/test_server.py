@@ -14,26 +14,7 @@ import uvicorn
 
 
 def run_server(port: int) -> None:
-    @contextlib.asynccontextmanager
-    async def lifespan(app: Starlette):
-        async with contextlib.AsyncExitStack() as stack:
-            await stack.enter_async_context(mcp.session_manager.run())
-            yield
-
-    app = FastAPI(title="Test Server", lifespan=lifespan)
-
-    @app.get("/")
-    async def root():
-        return {"message": "Hello World"}
-
-    mcp = FastMCP(streamable_http_path="/")
-
-    @mcp.tool()
-    def echo(self, text: str, ctx: Context):
-        print(ctx)
-        return text
-
-    app.mount("/mcp", app=mcp.streamable_http_app())
+    from fastapi_mcp_lowlevel.main import app
 
     server = uvicorn.Server(
         config=uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="debug")
@@ -98,7 +79,8 @@ async def test_mount(server_transport: str, server_port: int):
         assert response.json() == {"message": "Hello World"}
 
     async with streamablehttp_client(
-        url=f"http://127.0.0.1:{server_port}/mcp"
+        url=f"http://127.0.0.1:{server_port}/mcp",
+        headers={"Authorization": "Bearer test"},
     ) as client:
         read_stream, write_stream, get_session_id = client
 
