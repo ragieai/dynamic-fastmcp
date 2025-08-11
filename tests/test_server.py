@@ -88,5 +88,5 @@ async def test_mount(server_transport: str, server_port: int):
             result = await session.initialize()
             tools_result = await session.list_tools()
             tools = [tool.name for tool in tools_result.tools]
-            assert len(tools) == 1
-            assert tools == ["echo"]
+            assert len(tools) == 2
+            assert tools == ["dynamic_echo", "echo"]
