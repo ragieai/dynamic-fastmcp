@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import uuid
 from fastapi import FastAPI
 from pydantic import AnyHttpUrl
 from starlette.applications import Starlette
@@ -31,7 +32,7 @@ class TestTokenVerifier(TokenVerifier):
         if token != "test":
             return None
 
-        return AccessToken(token=token, client_id="test", scopes=["test"])
+        return AccessToken(token=token, client_id=str(uuid.uuid4()), scopes=[])
 
 
 mcp = FastMCP(
@@ -44,8 +45,12 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool()
-def echo(self, text: str, ctx: Context):
+@mcp.tool(description="Echoes the input text")
+def echo(text: str, ctx: Context):
+    request = ctx.request_context.request
+    assert request is not None, "Expected request to be set"
+
+    logger.info(f">>>>>>>>>>>>>>>>>>>>>>>> Echoing: {request.user.username}")
     return text
 
 
