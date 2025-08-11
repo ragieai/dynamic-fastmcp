@@ -55,20 +55,36 @@ async def test_dynamic_tool_registration():
 
     assert len(resolved_tools) == 2
     assert resolved_tools[0].name == "dynamic_echo"
+    assert resolved_tools[0].title is None
     assert resolved_tools[0].description == "Dynamic Echo description for username: bob"
+    assert resolved_tools[0].annotations is None
     assert resolved_tools[0].inputSchema == {
         "properties": {"text": {"title": "Text", "type": "string"}},
         "required": ["text"],
         "title": "handle_callArguments",
         "type": "object",
     }
+    assert resolved_tools[0].outputSchema == {
+        "properties": {"result": {"title": "Result", "type": "string"}},
+        "required": ["result"],
+        "title": "handle_callOutput",
+        "type": "object",
+    }
 
     assert resolved_tools[1].name == "echo"
+    assert resolved_tools[1].title is None
     assert resolved_tools[1].description == "Regular Echo"
+    assert resolved_tools[1].annotations is None
     assert resolved_tools[1].inputSchema == {
         "properties": {"text": {"title": "Text", "type": "string"}},
         "required": ["text"],
         "title": "echoArguments",
+        "type": "object",
+    }
+    assert resolved_tools[1].outputSchema == {
+        "properties": {"result": {"title": "Result", "type": "string"}},
+        "required": ["result"],
+        "title": "echoOutput",
         "type": "object",
     }
 
