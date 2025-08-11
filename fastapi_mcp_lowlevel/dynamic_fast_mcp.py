@@ -1,16 +1,25 @@
 import asyncio
-from typing import Any, Awaitable, Callable, Protocol, runtime_checkable
+import inspect
+from typing import Any, Awaitable, Callable, Protocol, get_origin, runtime_checkable
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.server.fastmcp.tools.tool_manager import ToolManager
-from mcp.server.fastmcp.utilities.func_metadata import FuncMetadata, ArgModelBase
+from mcp.server.fastmcp.utilities.func_metadata import (
+    FuncMetadata,
+    ArgModelBase,
+    func_metadata,
+)
 from mcp.types import Tool as MCPTool, AnyFunction
 
 
 @runtime_checkable
 class DynamicTool(Protocol):
+    # TODO: name and structured_output seem like they could be part of a meta class
     def name(self) -> str:
         """Return the name of the tool."""
+
+    def structured_output(self) -> bool | None:
+        """Return whether the tool returns structured output."""
 
     def handle_description(self, ctx: Context) -> Awaitable[str]:
         """Return the description of the tool."""
@@ -41,19 +50,23 @@ class DynamicToolManager(ToolManager):
         )
 
     async def _resolve_dynamic_tool(self, tool: DynamicTool, context: Context) -> Tool:
+        context_kwarg = _find_context_kwarg(tool.handle_call)
+        func_arg_metadata = func_metadata(
+            tool.handle_call,
+            skip_names=[context_kwarg] if context_kwarg is not None else [],
+            structured_output=tool.structured_output(),
+        )
+
+        parameters = func_arg_metadata.arg_model.model_json_schema(by_alias=True)
+
         return Tool(
             fn=tool.handle_call,
             name=tool.name(),
             title=None,  # TODO: add title
             description=await tool.handle_description(context),
-            parameters={},  # TODO: add parameters
-            fn_metadata=FuncMetadata(
-                arg_model=ArgModelBase,  # TODO: add arg_model
-                output_schema=None,  # TODO: add output_schema
-                output_model=None,  # TODO: add output_model
-                wrap_output=False,  # TODO: add wrap_output
-            ),
-            is_async=True,
+            parameters=parameters,
+            fn_metadata=func_arg_metadata,
+            is_async=True,  # TODO: add is_async
             context_kwarg=None,  # TODO: add context_kwarg
             annotations=None,  # TODO: add annotations
         )
@@ -103,3 +116,13 @@ class DynamicFastMCP(FastMCP):
             for tool in await self._tool_manager.list_dynamic_tools(context=context)
         ]
         return sorted(tools + dynamic_tools, key=lambda x: x.name)
+
+
+def _find_context_kwarg(fn: Callable[..., Any]) -> str | None:
+    sig = inspect.signature(fn)
+    for param_name, param in sig.parameters.items():
+        if get_origin(param.annotation) is not None:
+            continue
+        if issubclass(param.annotation, Context):
+            return param_name
+    return None
