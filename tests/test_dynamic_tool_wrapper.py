@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 import pytest
-from fastapi_mcp_lowlevel.dynamic_fast_mcp import DynamicTool, DynamicToolWrapper
+from dynamic_fastmcp.dynamic_fastmcp import DynamicTool, DynamicToolWrapper
 from mcp.server.fastmcp import Context
 from starlette.authentication import SimpleUser
 

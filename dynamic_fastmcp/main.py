@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.auth.provider import TokenVerifier, AccessToken
 from mcp.server.auth.settings import AuthSettings
 
-from fastapi_mcp_lowlevel.dynamic_fast_mcp import DynamicFastMCP, DynamicTool
+from dynamic_fastmcp.dynamic_fastmcp import DynamicFastMCP, DynamicTool
 
 
 logger = logging.getLogger(__name__)

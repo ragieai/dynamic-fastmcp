@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "fastapi-mcp-lowlevel"
+name = "dynamic-fastmcp"
 version = "0.1.0"
 description = ""
 authors = ["Bob Remeika <bob@ragie.ai>"]

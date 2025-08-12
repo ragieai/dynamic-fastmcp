@@ -1,6 +1,6 @@
 from typing import Any
 from mcp.server.fastmcp import Context
-from fastapi_mcp_lowlevel.dynamic_fast_mcp import DynamicTool, DynamicToolManager
+from dynamic_fastmcp.dynamic_fastmcp import DynamicTool, DynamicToolManager
 
 
 def test_add_tool_duplicate_warning(caplog):

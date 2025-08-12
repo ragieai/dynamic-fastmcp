@@ -11,7 +11,7 @@ import uvicorn
 
 
 def run_server(port: int) -> None:
-    from fastapi_mcp_lowlevel.main import app
+    from dynamic_fastmcp.main import app
 
     server = uvicorn.Server(
         config=uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="debug")

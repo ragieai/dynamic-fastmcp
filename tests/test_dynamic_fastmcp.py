@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 from mcp.server.fastmcp import Context
 import pytest
-from fastapi_mcp_lowlevel.dynamic_fast_mcp import (
+from dynamic_fastmcp.dynamic_fastmcp import (
     DynamicFastMCP,
     DynamicTool,
     DynamicToolManager,
