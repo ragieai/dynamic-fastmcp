@@ -6,7 +6,6 @@ from fastapi_mcp_lowlevel.dynamic_fast_mcp import (
     DynamicTool,
     DynamicToolManager,
 )
-from mcp.shared.context import RequestContext
 from starlette.authentication import SimpleUser
 
 
@@ -113,9 +112,9 @@ async def test_call_tool():
             assert ctx.request_context.request is not None
             return f"Dynamic Echo description for username: {ctx.request_context.request.user.username}"
 
-        async def handle_call(self, text: str, ctx: Context) -> str:
-            assert ctx.request_context.request is not None
-            return f"Dynamic Echo call for username: {ctx.request_context.request.user.username}: {text}"
+        async def handle_call(self, text: str, context: Context) -> str:
+            assert context.request_context.request is not None
+            return f"Dynamic Echo call for username: {context.request_context.request.user.username}: {text}"
 
     result = await mcp.call_tool("dynamic_echo", {"text": "Hello, world!"})
     assert result == "Dynamic Echo call for username: bob: Hello, world!"

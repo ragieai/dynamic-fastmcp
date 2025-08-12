@@ -5,9 +5,6 @@ import time
 from typing import Generator
 from httpx import AsyncClient
 import pytest
-from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP, Context
-from starlette.applications import Starlette
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.session import ClientSession
 import uvicorn

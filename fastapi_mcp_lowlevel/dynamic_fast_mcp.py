@@ -1,11 +1,12 @@
 import asyncio
 import inspect
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Awaitable, Callable, Protocol, get_origin, runtime_checkable
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.server.fastmcp.tools.tool_manager import ToolManager
-from mcp.server.fastmcp.utilities.func_metadata import func_metadata
-from mcp.types import Tool as MCPTool, AnyFunction
+from mcp.server.fastmcp.utilities.func_metadata import FuncMetadata, func_metadata
+from mcp.types import Tool as MCPTool, AnyFunction, ToolAnnotations
 from mcp.shared.context import LifespanContextT, RequestT
 from mcp.server.session import ServerSessionT
 from mcp.server.fastmcp.exceptions import ToolError
@@ -27,8 +28,75 @@ class DynamicTool(Protocol):
         """Handle the call to the tool."""
 
 
+class DynamicToolWrapper(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    tool: DynamicTool = Field(exclude=True)
+    fn: Callable[..., Any] = Field(exclude=True)
+    name: str = Field(description="Name of the tool")
+    title: str | None = Field(None, description="Human-readable title of the tool")
+    parameters: dict[str, Any] = Field(description="JSON schema for tool parameters")
+    fn_metadata: FuncMetadata = Field(
+        description="Metadata about the function including a pydantic model for tool arguments"
+    )
+    is_async: bool = Field(description="Whether the tool is async")
+    context_kwarg: str | None = Field(
+        None, description="Name of the kwarg that should receive context"
+    )
+    annotations: ToolAnnotations | None = Field(
+        None, description="Optional annotations for the tool"
+    )
+
+    async def run(
+        self,
+        arguments: dict[str, Any],
+        context: Context[ServerSessionT, LifespanContextT, RequestT] | None = None,
+        convert_result: bool = False,
+    ) -> Awaitable[Any]:
+        kwargs = arguments
+        if self.context_kwarg:
+            kwargs[self.context_kwarg] = context
+        return await self.tool.handle_call(**kwargs)
+
+    async def resolve_tool(self, context: Context) -> Tool:
+        return Tool(
+            fn=self.tool.handle_call,
+            name=self.tool.name(),
+            title=None,  # TODO: add title
+            description=await self.tool.handle_description(context),
+            parameters=self.parameters,
+            fn_metadata=self.fn_metadata,
+            is_async=True,  # TODO: add is_async
+            context_kwarg=self.context_kwarg,
+            annotations=None,  # TODO: add annotations
+        )
+
+    @classmethod
+    def from_dynamic_tool(cls, tool: DynamicTool) -> "DynamicToolWrapper":
+        context_kwarg = _find_context_kwarg(tool.handle_call)
+        func_arg_metadata = func_metadata(
+            tool.handle_call,
+            skip_names=[context_kwarg] if context_kwarg is not None else [],
+            structured_output=tool.structured_output(),
+        )
+
+        parameters = func_arg_metadata.arg_model.model_json_schema(by_alias=True)
+
+        return cls(
+            tool=tool,
+            fn=tool.handle_call,
+            name=tool.name(),
+            title=None,  # TODO: add title
+            parameters=parameters,
+            fn_metadata=func_arg_metadata,
+            is_async=True,  # TODO: add is_async
+            context_kwarg=context_kwarg,
+            annotations=None,  # TODO: add annotations
+        )
+
+
 class DynamicToolManager(ToolManager):
-    _dynamic_tools: dict[str, DynamicTool]
+    _dynamic_tools: dict[str, DynamicToolWrapper]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -38,11 +106,11 @@ class DynamicToolManager(ToolManager):
     def get_tool(self, name: str) -> Tool | None:
         raise NotImplementedError("DynamicToolManager does not support get_tool")
 
-    def _get_tool(self, name: str) -> Tool | DynamicTool | None:
+    def _get_tool(self, name: str) -> Tool | DynamicToolWrapper | None:
         return self._tools.get(name) or self._dynamic_tools.get(name)
 
     def add_dynamic_tool(self, tool: DynamicTool) -> None:
-        self._dynamic_tools[tool.name()] = tool
+        self._dynamic_tools[tool.name()] = DynamicToolWrapper.from_dynamic_tool(tool)
 
     async def call_tool(
         self,
@@ -54,19 +122,8 @@ class DynamicToolManager(ToolManager):
         tool = self._get_tool(name)
         if not tool:
             raise ToolError(f"Unknown tool: {name}")
-        if isinstance(tool, DynamicTool):
-
-            async def run(
-                arguments: dict[str, Any],
-                context: (
-                    Context[ServerSessionT, LifespanContextT, RequestT] | None
-                ) = None,
-                convert_result: bool = False,
-            ) -> Awaitable[Any]:
-                # TODO: The context variable name is should be configurable
-                return await tool.handle_call(**arguments, ctx=context)
-
-            return await run(arguments, context, convert_result)
+        if isinstance(tool, DynamicToolWrapper):
+            return await tool.run(arguments, context, convert_result)
         else:
             return await super().call_tool(name, arguments, context, convert_result)
 
@@ -75,32 +132,7 @@ class DynamicToolManager(ToolManager):
 
     async def _resolve_dynamic_tools(self, context: Context) -> list[Tool]:
         return await asyncio.gather(
-            *[
-                self._resolve_dynamic_tool(tool, context)
-                for tool in self._dynamic_tools.values()
-            ]
-        )
-
-    async def _resolve_dynamic_tool(self, tool: DynamicTool, context: Context) -> Tool:
-        context_kwarg = _find_context_kwarg(tool.handle_call)
-        func_arg_metadata = func_metadata(
-            tool.handle_call,
-            skip_names=[context_kwarg] if context_kwarg is not None else [],
-            structured_output=tool.structured_output(),
-        )
-
-        parameters = func_arg_metadata.arg_model.model_json_schema(by_alias=True)
-
-        return Tool(
-            fn=tool.handle_call,
-            name=tool.name(),
-            title=None,  # TODO: add title
-            description=await tool.handle_description(context),
-            parameters=parameters,
-            fn_metadata=func_arg_metadata,
-            is_async=True,  # TODO: add is_async
-            context_kwarg=None,  # TODO: add context_kwarg
-            annotations=None,  # TODO: add annotations
+            *[tool.resolve_tool(context) for tool in self._dynamic_tools.values()]
         )
 
 
