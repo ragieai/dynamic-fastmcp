@@ -4,12 +4,11 @@ from typing import Any, Awaitable, Callable, Protocol, get_origin, runtime_check
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.server.fastmcp.tools.tool_manager import ToolManager
-from mcp.server.fastmcp.utilities.func_metadata import (
-    FuncMetadata,
-    ArgModelBase,
-    func_metadata,
-)
+from mcp.server.fastmcp.utilities.func_metadata import func_metadata
 from mcp.types import Tool as MCPTool, AnyFunction
+from mcp.shared.context import LifespanContextT, RequestT
+from mcp.server.session import ServerSessionT
+from mcp.server.fastmcp.exceptions import ToolError
 
 
 @runtime_checkable
@@ -35,8 +34,41 @@ class DynamicToolManager(ToolManager):
         super().__init__(*args, **kwargs)
         self._dynamic_tools = {}
 
+    # This method is not supported because it only returns Tool objects, not DynamicTool objects.
+    def get_tool(self, name: str) -> Tool | None:
+        raise NotImplementedError("DynamicToolManager does not support get_tool")
+
+    def _get_tool(self, name: str) -> Tool | DynamicTool | None:
+        return self._tools.get(name) or self._dynamic_tools.get(name)
+
     def add_dynamic_tool(self, tool: DynamicTool) -> None:
         self._dynamic_tools[tool.name()] = tool
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Context[ServerSessionT, LifespanContextT, RequestT] | None = None,
+        convert_result: bool = False,
+    ) -> Any:
+        tool = self._get_tool(name)
+        if not tool:
+            raise ToolError(f"Unknown tool: {name}")
+        if isinstance(tool, DynamicTool):
+
+            async def run(
+                arguments: dict[str, Any],
+                context: (
+                    Context[ServerSessionT, LifespanContextT, RequestT] | None
+                ) = None,
+                convert_result: bool = False,
+            ) -> Awaitable[Any]:
+                # TODO: The context variable name is should be configurable
+                return await tool.handle_call(**arguments, ctx=context)
+
+            return await run(arguments, context, convert_result)
+        else:
+            return await super().call_tool(name, arguments, context, convert_result)
 
     async def list_dynamic_tools(self, context: Context) -> list[Tool]:
         return await self._resolve_dynamic_tools(context)

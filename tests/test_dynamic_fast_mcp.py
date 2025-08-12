@@ -18,7 +18,7 @@ def test_init():
 
 
 @pytest.mark.asyncio
-async def test_dynamic_tool_registration():
+async def test_list_tools():
     mcp = DynamicFastMCP()
 
     mcp.get_context = Mock(
@@ -87,5 +87,37 @@ async def test_dynamic_tool_registration():
         "title": "echoOutput",
         "type": "object",
     }
+
+    mcp.get_context.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_call_tool():
+    mcp = DynamicFastMCP()
+
+    context = Context(
+        request_context=Mock(request=Mock(user=SimpleUser(username="bob")))
+    )
+
+    mcp.get_context = Mock(return_value=context)
+
+    @mcp.tool()
+    class DynamicEcho(DynamicTool):
+        def name(self) -> str:
+            return "dynamic_echo"
+
+        def structured_output(self) -> bool | None:
+            return None
+
+        async def handle_description(self, ctx: Context) -> str:
+            assert ctx.request_context.request is not None
+            return f"Dynamic Echo description for username: {ctx.request_context.request.user.username}"
+
+        async def handle_call(self, text: str, ctx: Context) -> str:
+            assert ctx.request_context.request is not None
+            return f"Dynamic Echo call for username: {ctx.request_context.request.user.username}: {text}"
+
+    result = await mcp.call_tool("dynamic_echo", {"text": "Hello, world!"})
+    assert result == "Dynamic Echo call for username: bob: Hello, world!"
 
     mcp.get_context.assert_called_once()
