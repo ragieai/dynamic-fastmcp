@@ -63,12 +63,16 @@ class DynamicEcho(DynamicTool):
     async def handle_description(self, ctx: Context) -> str:
         request = ctx.request_context.request
         assert request is not None, "Expected request to be set"
-        return f"Echoes the input text: {request.user.username}"
+
+        path = request.path_params["id"]
+        return f"Echoes the input text: {request.user.username} (path: {path})"
 
     async def handle_call(self, text: str, ctx: Context) -> str:
         request = ctx.request_context.request
         assert request is not None, "Expected request to be set"
-        return f"Echo to user ({request.user.username}): {text}"
+
+        path = request.path_params["id"]
+        return f"Echo to user ({request.user.username}): {text} (path: {path})"
 
 
-app.mount("/mcp", app=mcp.streamable_http_app())
+app.mount("/mcp/{id}", app=mcp.streamable_http_app())

@@ -1,4 +1,4 @@
-import contextlib
+import re
 import multiprocessing
 import socket
 import time
@@ -76,7 +76,7 @@ async def test_mount(server_transport: str, server_port: int):
         assert response.json() == {"message": "Hello World"}
 
     async with streamablehttp_client(
-        url=f"http://127.0.0.1:{server_port}/mcp",
+        url=f"http://127.0.0.1:{server_port}/mcp/123",
         headers={"Authorization": "Bearer test"},
     ) as client:
         read_stream, write_stream, get_session_id = client
@@ -84,6 +84,16 @@ async def test_mount(server_transport: str, server_port: int):
         async with ClientSession(read_stream, write_stream) as session:
             result = await session.initialize()
             tools_result = await session.list_tools()
-            tools = [tool.name for tool in tools_result.tools]
+
+            tools = tools_result.tools
             assert len(tools) == 2
-            assert tools == ["dynamic_echo", "echo"]
+
+            assert tools[0].name == "dynamic_echo"
+            assert tools[0].description
+            assert re.match(
+                r"Echoes the input text: ([0-9a-fA-F-]{36}) \(path: 123\)",
+                tools[0].description,
+            )
+
+            assert tools[1].name == "echo"
+            assert tools[1].description == "Echoes the input text"
