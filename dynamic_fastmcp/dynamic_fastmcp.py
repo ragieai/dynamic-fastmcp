@@ -106,10 +106,6 @@ class DynamicToolManager(ToolManager):
         super().__init__(*args, **kwargs)
         self._dynamic_tools = {}
 
-    # This method is not supported because it only returns Tool objects, not DynamicTool objects.
-    def get_tool(self, name: str) -> Tool | None:
-        raise NotImplementedError("DynamicToolManager does not support get_tool")
-
     def _get_tool(self, name: str) -> Tool | DynamicToolWrapper | None:
         return self._tools.get(name) or self._dynamic_tools.get(name)
 
