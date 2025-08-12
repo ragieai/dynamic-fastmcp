@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import logging
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Awaitable, Callable, Protocol, get_origin, runtime_checkable
 from mcp.server.fastmcp import FastMCP, Context
@@ -10,6 +11,9 @@ from mcp.types import Tool as MCPTool, AnyFunction, ToolAnnotations
 from mcp.shared.context import LifespanContextT, RequestT
 from mcp.server.session import ServerSessionT
 from mcp.server.fastmcp.exceptions import ToolError
+
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -109,7 +113,42 @@ class DynamicToolManager(ToolManager):
     def _get_tool(self, name: str) -> Tool | DynamicToolWrapper | None:
         return self._tools.get(name) or self._dynamic_tools.get(name)
 
+    def add_tool(
+        self,
+        fn: Callable[..., Any],
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: ToolAnnotations | None = None,
+        structured_output: bool | None = None,
+    ) -> Tool:
+        existing = self._get_tool_if_exists_in_dynamic_tools(fn, name)
+        if existing:
+            if self.warn_on_duplicate_tools:
+                logger.warning(f"Tool already exists: {existing.name}")
+
+            # FIXME: This is a hack to satisfy the type checker.  It does not look like
+            #        the result of add_tool is used anywhere internally (2025-08-12).
+            return existing
+
+        return super().add_tool(
+            fn, name, title, description, annotations, structured_output
+        )
+
+    def _get_tool_if_exists_in_dynamic_tools(
+        self, fn: Callable[..., Any], name: str | None = None
+    ) -> Tool | None:
+        tool = Tool.from_function(fn, name=name)
+        name = tool.name
+        return tool if self._dynamic_tools.get(name) else None
+
     def add_dynamic_tool(self, tool: DynamicTool) -> None:
+        existing = self._tools.get(tool.name())
+        if existing:
+            if self.warn_on_duplicate_tools:
+                logger.warning(f"Tool already exists: {tool.name()}")
+            return
+
         self._dynamic_tools[tool.name()] = DynamicToolWrapper.from_dynamic_tool(tool)
 
     async def call_tool(
