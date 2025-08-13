@@ -60,6 +60,9 @@ class DynamicEcho(DynamicTool):
     def name(self) -> str:
         return "dynamic_echo"
 
+    def structured_output(self) -> bool | None:
+        return True
+
     async def handle_description(self, ctx: Context) -> str:
         request = ctx.request_context.request
         assert request is not None, "Expected request to be set"

@@ -106,7 +106,7 @@ async def test_call_tool():
             return "dynamic_echo"
 
         def structured_output(self) -> bool | None:
-            return None
+            return True
 
         async def handle_description(self, ctx: Context) -> str:
             assert ctx.request_context.request is not None
@@ -116,7 +116,9 @@ async def test_call_tool():
             assert context.request_context.request is not None
             return f"Dynamic Echo call for username: {context.request_context.request.user.username}: {text}"
 
-    result = await mcp.call_tool("dynamic_echo", {"text": "Hello, world!"})
-    assert result == "Dynamic Echo call for username: bob: Hello, world!"
+    _content_block, result = await mcp.call_tool(
+        "dynamic_echo", {"text": "Hello, world!"}
+    )
+    assert result == {"result": "Dynamic Echo call for username: bob: Hello, world!"}
 
     mcp.get_context.assert_called_once()

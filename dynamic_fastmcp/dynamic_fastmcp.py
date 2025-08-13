@@ -51,16 +51,31 @@ class DynamicToolWrapper(BaseModel):
         None, description="Optional annotations for the tool"
     )
 
+    # TODO: This is a copy of Tool.run.  It should be refactored to be shared.
     async def run(
         self,
         arguments: dict[str, Any],
         context: Context[ServerSessionT, LifespanContextT, RequestT] | None = None,
         convert_result: bool = False,
     ) -> Awaitable[Any]:
-        kwargs = arguments
-        if self.context_kwarg:
-            kwargs[self.context_kwarg] = context
-        return await self.tool.handle_call(**kwargs)
+        try:
+            result = await self.fn_metadata.call_fn_with_arg_validation(
+                self.tool.handle_call,
+                True,
+                arguments,
+                (
+                    {self.context_kwarg: context}
+                    if self.context_kwarg is not None
+                    else None
+                ),
+            )
+
+            if convert_result:
+                result = self.fn_metadata.convert_result(result)
+
+            return result
+        except Exception as e:
+            raise ToolError(f"Error executing tool {self.name}: {e}") from e
 
     async def resolve_tool(self, context: Context) -> Tool:
         return Tool(
