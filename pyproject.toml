@@ -8,13 +8,13 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 fastmcp = "^2.11.2"
-fastapi = {extras = ["standard"], version = "^0.116.1"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 pytest-asyncio = "^0.24.0"
 httpx = "^0.28.1"
 uvicorn = "^0.29.0"
+fastapi = {extras = ["standard"], version = "^0.116.1"}
 
 [build-system]
 requires = ["poetry-core"]
